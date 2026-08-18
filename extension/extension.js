@@ -709,6 +709,69 @@ export default class WindowMosaicExtension extends Extension {
             mw.get_transient_for() !== null;
     }
 
+    toggleFloatingWindow(window = null) {
+        window = window ?? global.display.focus_window;
+        if (!window) return;
+
+        if (this.windowingManager.isMaximizedOrFullscreen(window)) {
+            Logger.log(`[FLOAT] ${window.get_id()} maximized - ignoring float toggle`);
+            return;
+        }
+
+        const actor = window.get_compositor_private();
+
+        if (window.is_above()) {
+            window.unmake_above();
+            Logger.log(`[FLOAT] Window ${window.get_id()} unfloated, returning to mosaic`);
+            if (actor && !actor.is_destroyed()) {
+                const hop = Math.round(constants.ANIMATION_DURATION_MS / 2);
+                actor.remove_transition('scale_x');
+                actor.remove_transition('scale_y');
+                actor.remove_transition('translation_y');
+                actor.ease({
+                    scale_x: 0.94,
+                    scale_y: 0.94,
+                    translation_y: 12,
+                    duration: hop,
+                    mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+                    onComplete: () => {
+                        if (actor.is_destroyed()) return;
+                        actor.ease({
+                            scale_x: 1,
+                            scale_y: 1,
+                            translation_y: 0,
+                            duration: hop,
+                            mode: Clutter.AnimationMode.EASE_IN_OUT_QUAD,
+                        });
+                    },
+                });
+            }
+        } else {
+            window.make_above();
+            Logger.log(`[FLOAT] Window ${window.get_id()} floated (always-on-top)`);
+            if (actor && !actor.is_destroyed()) {
+                const hop = Math.round(constants.ANIMATION_DURATION_MS / 2);
+                actor.ease({
+                    scale_x: 1.06,
+                    scale_y: 1.06,
+                    translation_y: -12,
+                    duration: hop,
+                    mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+                    onComplete: () => {
+                        if (actor.is_destroyed()) return;
+                        actor.ease({
+                            scale_x: 1,
+                            scale_y: 1,
+                            translation_y: 0,
+                            duration: hop,
+                            mode: Clutter.AnimationMode.EASE_IN_OUT_QUAD,
+                        });
+                    },
+                });
+            }
+        }
+    }
+
     _onFocusWindowChanged() {
         const window = global.display.focus_window;
         if (!window) return;
@@ -897,6 +960,10 @@ export default class WindowMosaicExtension extends Extension {
         Logger.log('Registering swap-down keybinding');
         Main.wm.addKeybinding('swap-down', settings, Meta.KeyBindingFlags.NONE, Shell.ActionMode.NORMAL,
             () => this._swapActiveWindow('down'));
+
+        Logger.log('Registering float-toggle keybinding (Super+F)');
+        Main.wm.addKeybinding('float-toggle', settings, Meta.KeyBindingFlags.NONE, Shell.ActionMode.NORMAL,
+            () => this.toggleFloatingWindow());
 
         Logger.log('All swap keybindings registered successfully');
         Logger.log('Keyboard shortcuts registered');
