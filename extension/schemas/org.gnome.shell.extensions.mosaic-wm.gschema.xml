@@ -41,5 +41,10 @@
       <summary>Swap window downward</summary>
       <description>Swap the active window with its lower neighbor (quarter tiles only)</description>
     </key>
+    <key name="float-toggle" type="as">
+      <default>['&lt;Super&gt;F']</default>
+      <summary>Float or unfloat the active window</summary>
+      <description>Toggle the active window between floating (always-on-top, outside the mosaic) and tiled back into the mosaic</description>
+    </key>
   </schema>
 </schemalist>
