@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 import * as Logger from './logger.js';
-import { Extension, InjectionManager } from 'resource:///org/gnome/shell/extensions/extension.js';
+import { Extension, InjectionManager, gettext as _ } from 'resource:///org/gnome/shell/extensions/extension.js';
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
@@ -14,6 +14,8 @@ import * as Workspace from 'resource:///org/gnome/shell/ui/workspace.js';
 import * as WorkspaceAnimation from 'resource:///org/gnome/shell/ui/workspaceAnimation.js';
 import * as Screenshot from 'resource:///org/gnome/shell/ui/screenshot.js';
 import * as WindowPreviewModule from 'resource:///org/gnome/shell/ui/windowPreview.js';
+import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
+import * as WindowMenuModule from 'resource:///org/gnome/shell/ui/windowMenu.js';
 
 import { WindowingManager } from './windowing.js';
 import * as constants from './constants.js';
@@ -514,6 +516,34 @@ export default class WindowMosaicExtension extends Extension {
             return function (...args) {
                 extension.miniatureManager?.resumeFromScreenshot();
                 return originalMethod.apply(this, args);
+            };
+        });
+
+        this._injectionManager.overrideMethod(WindowMenuModule.WindowMenu.prototype, '_buildMenu', originalMethod => {
+            const extension = this;
+            return function (window) {
+                originalMethod.call(this, window);
+
+                const floatItem = this.addAction(
+                    window.is_above() ? _('Return to the mosaic') : _('Float above the mosaic'),
+                    () => extension.toggleFloatingWindow(window));
+                if (window.is_maximized() || window.is_fullscreen())
+                    floatItem.setSensitive(false);
+
+                const items = this._getMenuItems();
+                const last = items.length - 1;
+                let sepIndex = -1;
+                for (let i = last - 1; i >= 0; i--) {
+                    if (items[i] instanceof PopupMenu.PopupSeparatorMenuItem) {
+                        sepIndex = i;
+                        break;
+                    }
+                }
+                if (sepIndex >= 0) {
+                    this.box.remove_child(floatItem.actor);
+                    this.box.insert_child_at_index(floatItem.actor, sepIndex);
+                    this.addMenuItem(new PopupMenu.PopupSeparatorMenuItem(), sepIndex);
+                }
             };
         });
 
